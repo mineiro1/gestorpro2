@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
@@ -9,7 +9,57 @@ import { LocalNotifications } from '@capacitor/local-notifications';
 import EmployeeLocationTracker from './EmployeeLocationTracker';
 import SmsGatewayListener from './SmsGatewayListener';
 
+
+const NotificationBanner = () => {
+  const [permission, setPermission] = useState(Notification.permission);
+  const [dismissed, setDismissed] = useState(sessionStorage.getItem('notif_banner_dismissed') === 'true');
+
+  if (permission !== 'default' || dismissed) return null;
+
+  const requestPermission = async () => {
+    try {
+      let perm;
+      if (Capacitor.isNativePlatform()) {
+        const res = await LocalNotifications.requestPermissions();
+        perm = res.display === 'granted' ? 'granted' : 'denied';
+      } else {
+        perm = await Notification.requestPermission();
+        if (perm === 'granted' && 'serviceWorker' in navigator) {
+           const reg = await navigator.serviceWorker.ready;
+           // Explicitly show a welcome notification to confirm it works via SW
+           reg.showNotification('Notificações Ativadas!', {
+             body: 'Você receberá alertas de visitas finalizadas aqui.',
+             icon: 'https://cdn-icons-png.flaticon.com/512/123/123382.png'
+           });
+        }
+      }
+      setPermission(perm);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const dismiss = () => {
+    sessionStorage.setItem('notif_banner_dismissed', 'true');
+    setDismissed(true);
+  };
+
+  return (
+    <div className="bg-blue-600 text-white p-4 flex flex-col sm:flex-row items-center justify-between shadow-md relative z-50">
+      <div className="flex items-center space-x-3 mb-2 sm:mb-0">
+        <Bell className="w-6 h-6 animate-pulse" />
+        <span className="text-sm font-medium">Ative as notificações para receber alertas quando um técnico finalizar uma visita.</span>
+      </div>
+      <div className="flex space-x-2">
+        <button onClick={requestPermission} className="bg-white text-blue-600 px-4 py-1.5 rounded-md text-sm font-bold shadow hover:bg-blue-50 transition cursor-pointer">Ativar</button>
+        <button onClick={dismiss} className="bg-blue-700 text-white px-3 py-1.5 rounded-md text-sm hover:bg-blue-800 transition cursor-pointer">Depois</button>
+      </div>
+    </div>
+  );
+};
+
 export default function Layout() {
+  const notifiedJobsRef = useRef<Set<string>>(new Set());
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const { isAdmin, isManager, isClient, userProfile } = useAuth();
   const navigate = useNavigate();
@@ -101,23 +151,32 @@ export default function Layout() {
       }
     };
 
-    const handleNewVisit = (payload: any) => {
+    const handleNewVisit = async (payload: any) => {
       if (payload.new) {
-        const isAssignedToMe = payload.new.employee_id === userProfile.uid;
         const isAdminOwner = userProfile.role === 'admin' && payload.new.admin_id === userProfile.uid;
-        if (isAssignedToMe || isAdminOwner) {
-          const msg = isAssignedToMe 
-            ? 'Você tem uma nova visita/manutenção agendada para hoje!'
-            : 'Uma nova visita foi criada no sistema.';
-          showNotification('Nova Visita Agendada', msg);
+        const isSelf = payload.new.employee_id === userProfile.uid;
+
+        if (isAdminOwner && !isSelf) {
+          try {
+            const { data: empData } = await supabase.from('users').select('name').eq('id', payload.new.employee_id).single();
+            const { data: cliData } = await supabase.from('clients').select('name').eq('id', payload.new.client_id).single();
+            
+            const empName = empData?.name || 'Colaborador';
+            const cliName = cliData?.name || 'Cliente';
+            
+            showNotification('Visita Finalizada', `O colaborador ${empName} finalizou a visita no cliente ${cliName}.`);
+          } catch (e) {
+            showNotification('Visita Finalizada', 'Um colaborador finalizou uma visita.');
+          }
         }
       }
     };
 
     const handleNewJob = (payload: any) => {
-      if (payload.new) {
+      if (payload.new && payload.eventType === 'INSERT') {
         const isAssignedToMe = payload.new.employee_id === userProfile.uid;
         const isAdminOwner = userProfile.role === 'admin' && payload.new.admin_id === userProfile.uid;
+
         if (isAssignedToMe || isAdminOwner) {
           const msg = isAssignedToMe
             ? 'Um novo serviço avulso foi agendado para você!'
@@ -126,10 +185,37 @@ export default function Layout() {
         }
       }
     };
+    
+    
+
+    const handleJobUpdate = async (payload: any) => {
+      if (payload.new && payload.old) {
+        const isAdminOwner = userProfile.role === 'admin' && payload.new.admin_id === userProfile.uid;
+        const isSelf = payload.new.employee_id === userProfile.uid;
+        
+        const wasNotCompleted = payload.old.status !== 'concluido';
+        const isNowCompleted = payload.new.status === 'concluido';
+
+        if (isAdminOwner && !isSelf && isNowCompleted && !notifiedJobsRef.current.has(payload.new.id)) {
+          notifiedJobsRef.current.add(payload.new.id);
+          try {
+            const { data: empData } = await supabase.from('users').select('name').eq('id', payload.new.employee_id).single();
+            
+            const empName = empData?.name || 'Colaborador';
+            const cliName = payload.new.client_name || 'Cliente';
+            
+            showNotification('Serviço Avulso Finalizado', `O colaborador ${empName} finalizou o serviço avulso para ${cliName}.`);
+          } catch (e) {
+            showNotification('Serviço Avulso Finalizado', 'Um colaborador finalizou um serviço avulso.');
+          }
+        }
+      }
+    };
 
     const channel = supabase.channel('employee-notifications-fix')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'visits' }, handleNewVisit)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'oneoffjobs' }, handleNewJob)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'oneoffjobs' }, handleJobUpdate)
       .subscribe();
 
     return () => {
@@ -140,9 +226,7 @@ export default function Layout() {
   useEffect(() => {
     // Solicita permissões de notificação e localização ativamente
     // Isso forçará o WebView ou app Wrapper no Android a exibir os dialogs
-    if ('Notification' in window && Notification.permission === 'default') {
-      Notification.requestPermission().catch(() => {});
-    }
+    
     
     // Tenta obter a localização apenas uma vez logo no início para ativar a permissão
     if ('geolocation' in navigator) {
@@ -335,6 +419,7 @@ export default function Layout() {
           </div>
         </header>
 
+        <NotificationBanner />
         <main className="flex-1 p-4 lg:p-8 overflow-y-auto bg-gray-100">
           <Outlet context={{ availableClients, selectedClientId }} />
         </main>
