@@ -42,6 +42,14 @@ export default function Billing() {
   const [sendingBatch, setSendingBatch] = useState(false);
   const [sendingProgress, setSendingProgress] = useState({ current: 0, total: 0 });
   const [sentClients, setSentClients] = useState<Record<string, 'success'|'error'>>({});
+  const [billedClients, setBilledClients] = useState<Record<string, string>>(() => {
+    try {
+      const stored = localStorage.getItem('gestaopro_billed_clients');
+      return stored ? JSON.parse(stored) : {};
+    } catch {
+      return {};
+    }
+  });
   const [waSettings, setWaSettings] = useState({
     reminderDays: 3,
     reminderMessage: 'Olá {nome}, tudo bem? Passando para lembrar que sua mensalidade no valor de R$ {valor} vence no dia {vencimento}.',
@@ -395,6 +403,11 @@ export default function Billing() {
       return;
     }
 
+    const todayStr = new Date().toLocaleDateString('pt-BR');
+    const newBilled = { ...billedClients, [client.id]: todayStr };
+    setBilledClients(newBilled);
+    localStorage.setItem('gestaopro_billed_clients', JSON.stringify(newBilled));
+
     const cleanPhone = client.phone.replace(/\D/g, '');
     const isDelayed = client.status === 'delayed';
     
@@ -449,9 +462,17 @@ export default function Billing() {
       let errorCount = 0;
       let lastError = '';
       
+      const todayStr = new Date().toLocaleDateString('pt-BR');
+
       for (let i = 0; i < clients.length; i++) {
         const client = clients[i];
         setSendingProgress({ current: i + 1, total: clients.length });
+        
+        // Skip if already billed today
+        if (billedClients[client.id] === todayStr) {
+          successCount++; // count as success to skip
+          continue;
+        }
         
         if (!client.phone) {
           errorCount++;
@@ -795,17 +816,27 @@ export default function Billing() {
                         >
                           <DollarSign size={18} />
                         </button>
-                        <button
-                          onClick={() => handleSendWhatsApp(client)}
-                          className={`flex items-center px-4 py-2 rounded-lg transition-colors font-semibold shadow-sm border ${
-                            client.status === 'delayed' 
-                              ? 'bg-red-50 text-red-700 border-red-200 hover:bg-red-100' 
-                              : 'bg-[#25D366] text-white border-transparent hover:bg-[#20b858]'
-                          }`}
-                        >
-                          <MessageCircle size={18} className="mr-2" />
-                          {client.status === 'delayed' ? 'Cobrar' : 'Lembrete'}
-                        </button>
+                                                {(() => {
+                          const today = new Date().toLocaleDateString('pt-BR');
+                          const alreadyBilled = billedClients[client.id] === today;
+                          
+                          return (
+                            <button
+                              onClick={() => handleSendWhatsApp(client)}
+                              disabled={alreadyBilled}
+                              className={`flex items-center px-4 py-2 rounded-lg transition-colors font-semibold shadow-sm border ${
+                                alreadyBilled 
+                                  ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
+                                  : client.status === 'delayed' 
+                                    ? 'bg-red-50 text-red-700 border-red-200 hover:bg-red-100 cursor-pointer' 
+                                    : 'bg-[#25D366] text-white border-transparent hover:bg-[#20b858] cursor-pointer'
+                              }`}
+                            >
+                              <MessageCircle size={18} className="mr-2" />
+                              {alreadyBilled ? 'Enviado Hoje' : (client.status === 'delayed' ? 'Cobrar' : 'Lembrete')}
+                            </button>
+                          );
+                        })()}
                       </>
                     )}
                   </div>
