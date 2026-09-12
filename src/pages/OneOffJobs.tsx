@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { Briefcase, MapPin, Calendar, DollarSign, User, Plus, Edit, Trash2, CheckCircle } from 'lucide-react';
-import { useAutoRefresh } from '../hooks/useAutoRefresh';
+import { useRealtimeUpdates } from '../hooks/useRealtimeUpdates';
 
 interface OneOffJob {
   id?: string;
@@ -23,8 +23,8 @@ interface OneOffJob {
 export default function OneOffJobs() {
   const { userProfile } = useAuth();
   
-  const [refreshTrigger, setRefreshTrigger] = useState(0);
-  useAutoRefresh(() => setRefreshTrigger(t => t + 1), 30000);
+  const adminId = userProfile?.role === 'admin' ? userProfile.uid : userProfile?.adminId;
+  const refreshTrigger = useRealtimeUpdates(['oneoffjobs'], 'admin_id', adminId);
 
   const [jobs, setJobs] = useState<OneOffJob[]>([]);
   const [employees, setEmployees] = useState<{id: string, name: string}[]>([]);

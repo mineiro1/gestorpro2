@@ -3,7 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { Calendar, CheckCircle, X, Download, Star } from 'lucide-react';
 import { useOutletContext } from 'react-router-dom';
-import { useAutoRefresh } from '../hooks/useAutoRefresh';
+import { useRealtimeUpdates } from '../hooks/useRealtimeUpdates';
 
 
 
@@ -104,8 +104,8 @@ const renderNotes = (notes: string) => {
 export default function ClientPanel() {
   const { userProfile } = useAuth();
   
-  const [refreshTrigger, setRefreshTrigger] = useState(0);
-  useAutoRefresh(() => setRefreshTrigger(t => t + 1), 30000);
+  const adminId = userProfile?.role === 'admin' ? userProfile.uid : userProfile?.adminId;
+  const refreshTrigger = useRealtimeUpdates(['clients', 'visits', 'payments'], 'admin_id', adminId);
 
   const context = useOutletContext<{ availableClients: any[], selectedClientId: string | null }>();
   const availableClients = context?.availableClients || [];
@@ -122,7 +122,7 @@ export default function ClientPanel() {
   useEffect(() => {
     const loadClientDetails = async () => {
       if (!selectedClientId) return;
-      setLoadingDetails(true);
+      if (!clientData) setLoadingDetails(true);
       try {
         const foundClient = availableClients.find(c => c.id === selectedClientId);
         if (!foundClient) {

@@ -4,13 +4,13 @@ import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { openWhatsApp } from '../lib/whatsapp';
 import { Edit, Trash2, Plus, DollarSign, RotateCcw, Package, Search, MessageCircle, PlusCircle } from 'lucide-react';
-import { useAutoRefresh } from '../hooks/useAutoRefresh';
+import { useRealtimeUpdates } from '../hooks/useRealtimeUpdates';
 
 export default function Clients() {
   const { userProfile, isAdmin, isManager } = useAuth();
   
-  const [refreshTrigger, setRefreshTrigger] = useState(0);
-  useAutoRefresh(() => setRefreshTrigger(t => t + 1), 30000); // 30s refresh
+  const adminId = userProfile?.role === 'admin' ? userProfile.uid : userProfile?.adminId;
+  const refreshTrigger = useRealtimeUpdates(['clients', 'payments'], 'admin_id', adminId);
 
   const [clients, setClients] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState('');

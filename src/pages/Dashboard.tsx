@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { Users, DollarSign, AlertCircle, CheckCircle, Clock, CreditCard, MessageCircle, Eye, EyeOff } from 'lucide-react';
-import { useAutoRefresh } from '../hooks/useAutoRefresh';
+import { useRealtimeUpdates } from '../hooks/useRealtimeUpdates';
 
 interface DashboardStats {
   totalClients: number;
@@ -27,8 +27,8 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [showValues, setShowValues] = useState(false);
 
-  const [refreshTrigger, setRefreshTrigger] = useState(0);
-  useAutoRefresh(() => setRefreshTrigger(t => t + 1), 30000); // 30s refresh
+  const adminId = userProfile?.role === 'admin' ? userProfile.uid : userProfile?.adminId;
+  const refreshTrigger = useRealtimeUpdates(['clients', 'visits', 'oneoffjobs', 'payments'], 'admin_id', adminId);
 
   useEffect(() => {
     if (!userProfile?.uid) return;

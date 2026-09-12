@@ -3,13 +3,13 @@ import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { openWhatsApp } from '../lib/whatsapp';
 import { MessageCircle, CheckSquare, Square, Image as ImageIcon, Video, X, Play } from 'lucide-react';
-import { useAutoRefresh } from '../hooks/useAutoRefresh';
+import { useRealtimeUpdates } from '../hooks/useRealtimeUpdates';
 
 export default function Messages() {
   const { userProfile, isAdmin, isManager } = useAuth();
   
-  const [refreshTrigger, setRefreshTrigger] = useState(0);
-  useAutoRefresh(() => setRefreshTrigger(t => t + 1), 30000);
+  const adminId = userProfile?.role === 'admin' ? userProfile.uid : userProfile?.adminId;
+  const refreshTrigger = useRealtimeUpdates(['clients'], 'admin_id', adminId);
 
   const [clients, setClients] = useState<any[]>([]);
   const [selectedClients, setSelectedClients] = useState<Set<string>>(new Set());

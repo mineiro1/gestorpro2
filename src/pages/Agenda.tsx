@@ -2,13 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { Edit2, Trash2, Plus, X } from 'lucide-react';
-import { useAutoRefresh } from '../hooks/useAutoRefresh';
+import { useRealtimeUpdates } from '../hooks/useRealtimeUpdates';
 
 export default function Agenda() {
   const { userProfile, isAdmin, isManager } = useAuth();
   
-  const [refreshTrigger, setRefreshTrigger] = useState(0);
-  useAutoRefresh(() => setRefreshTrigger(t => t + 1), 30000);
+  const adminId = userProfile?.role === 'admin' ? userProfile.uid : userProfile?.adminId;
+  const refreshTrigger = useRealtimeUpdates(['agenda_contacts'], 'admin_id', adminId);
 
   const [contacts, setContacts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -30,7 +30,7 @@ export default function Agenda() {
 
   const fetchAgenda = async () => {
     try {
-      setLoading(true);
+      if (contacts.length === 0) setLoading(true);
       const adminId = isAdmin ? userProfile.uid : userProfile.adminId;
       const { data, error } = await supabase.from('agenda_contacts').select('*').eq('admin_id', adminId).order('name', { ascending: true });
       if (error) throw error;

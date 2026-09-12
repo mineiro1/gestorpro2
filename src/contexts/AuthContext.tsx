@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { User } from '@supabase/supabase-js';
-import { useAutoRefresh } from '../hooks/useAutoRefresh';
+import { useRealtimeUpdates } from '../hooks/useRealtimeUpdates';
 
 export interface UserProfile {
   uid: string;
@@ -66,11 +66,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useAutoRefresh(() => {
-    if (currentUser) {
+  const refreshTrigger = useRealtimeUpdates(['users'], 'id', currentUser?.id);
+  useEffect(() => {
+    if (currentUser && refreshTrigger > 0) {
       handleUserChange(currentUser);
     }
-  }, 60000); // 1 minute refresh for auth context
+  }, [refreshTrigger]);
 
   useEffect(() => {
     // Check active sessions and sets the user
@@ -165,7 +166,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
         }
 
-        setUserProfile(mappedProfile);
+        
+        setUserProfile((prev: UserProfile | null) => {
+          if (!prev) return mappedProfile;
+          const prevStr = JSON.stringify(prev);
+          const newStr = JSON.stringify(mappedProfile);
+          return prevStr === newStr ? prev : mappedProfile;
+        });
+
         localStorage.setItem('cachedUserProfile', JSON.stringify(mappedProfile));
       } else {
          setUserProfile(null);

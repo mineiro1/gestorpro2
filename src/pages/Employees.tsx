@@ -4,13 +4,13 @@ import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { Edit, Trash2, Plus, MapPin } from 'lucide-react';
 import { openMap } from '../lib/maps';
-import { useAutoRefresh } from '../hooks/useAutoRefresh';
+import { useRealtimeUpdates } from '../hooks/useRealtimeUpdates';
 
 export default function Employees() {
   const { userProfile, isAdmin, isManager } = useAuth();
   
-  const [refreshTrigger, setRefreshTrigger] = useState(0);
-  useAutoRefresh(() => setRefreshTrigger(t => t + 1), 30000);
+  const adminId = userProfile?.role === 'admin' ? userProfile.uid : userProfile?.adminId;
+  const refreshTrigger = useRealtimeUpdates(['users'], 'admin_id', adminId);
 
   const [employees, setEmployees] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
