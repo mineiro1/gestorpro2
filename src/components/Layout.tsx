@@ -120,6 +120,14 @@ export default function Layout() {
     requestPerms();
 
     const showNotification = async (title: string, body: string) => {
+      // Play custom sound
+      try {
+        const audio = new Audio('/notificacao.mp3');
+        audio.play().catch(e => console.log("Audio play blocked by browser policy:", e));
+      } catch (err) {
+        console.error("Audio error", err);
+      }
+
       if (Capacitor.isNativePlatform()) {
         try {
           await LocalNotifications.schedule({
@@ -128,7 +136,8 @@ export default function Layout() {
                 title,
                 body,
                 id: new Date().getTime(),
-                schedule: { at: new Date(Date.now() + 1000) }
+                schedule: { at: new Date(Date.now() + 1000) },
+                sound: 'notificacao.mp3' // Attempt to use custom sound in Capacitor if configured, otherwise default
               }
             ]
           });
@@ -142,10 +151,15 @@ export default function Layout() {
               registration.showNotification(title, {
                 body,
                 icon: 'https://cdn-icons-png.flaticon.com/512/123/123382.png',
+                vibrate: [200, 100, 200, 100, 200], // Vibration pattern
               });
             });
           } else {
-            new Notification(title, { body, icon: 'https://cdn-icons-png.flaticon.com/512/123/123382.png' });
+            new Notification(title, { 
+              body, 
+              icon: 'https://cdn-icons-png.flaticon.com/512/123/123382.png',
+              vibrate: [200, 100, 200, 100, 200]
+            });
           }
         }
       }
