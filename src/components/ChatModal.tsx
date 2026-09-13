@@ -12,8 +12,11 @@ export function ChatModal({ isOpen, onClose, visit, client, waSettings }: any) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (isOpen && visit) {
+    if (isOpen && visit && visit.id) {
       loadOrCreateSession();
+    } else if (isOpen && visit && !visit.id) {
+      // Waiting for visitId to be resolved
+      setLoading(true);
     }
   }, [isOpen, visit]);
 
@@ -46,16 +49,20 @@ export function ChatModal({ isOpen, onClose, visit, client, waSettings }: any) {
         }
       } else {
         // Create new session if none exists
-        const adminId = userProfile?.role === 'admin' ? userProfile.id : userProfile?.adminId;
+        const adminId = userProfile?.role === 'admin' ? userProfile.uid : userProfile?.adminId;
+        
         const { data: newSession, error: createError } = await supabase
           .from('chat_sessions')
           .insert({
             visit_id: visit.id,
             admin_id: adminId,
             client_id: client.id,
-            employee_id: userProfile?.id,
+            employee_id: userProfile?.uid,
             status: 'open'
           }).select().single();
+          
+        console.log("CREATE SESSION RESULT:", newSession, "ERROR:", createError, "PARAMS:", { visit_id: visit.id, admin_id: adminId, client_id: client.id, employee_id: userProfile?.uid });
+
           
         if (!createError && newSession) {
           currentSession = newSession;
