@@ -108,14 +108,16 @@ export default function Messages() {
     });
   };
 
-  const sendEvolutionMessage = async (client: any, text: string, mediaBase64?: string, mimeType?: string) => {
-    const waSettings = userProfile?.whatsappSettings;
+  const sendEvolutionMessage = async (client: any, text: string, waSettings: any, mediaBase64?: string, mimeType?: string) => {
     if (!waSettings || !waSettings.evolutionApiUrl || !waSettings.evolutionApiKey || !waSettings.evolutionInstanceName) {
       throw new Error("Evolution API não configurada corretamente.");
     }
 
     const { evolutionApiKey, evolutionInstanceName } = waSettings;
-    const baseUrl = waSettings.evolutionApiUrl.replace(/\/$/, '');
+    let baseUrl = waSettings.evolutionApiUrl.trim().replace(/\/$/, '');
+    if (baseUrl && !baseUrl.startsWith('http')) {
+      baseUrl = 'https://' + baseUrl;
+    }
     const phoneInfo = client.phone.replace(/\D/g, '');
     const number = `55${phoneInfo}`;
 
@@ -265,7 +267,7 @@ export default function Messages() {
         setSendStatuses(prev => ({ ...prev, [client.id]: 'sending' }));
         try {
           const personalizedText = messageText.replace(/\{nome\}/g, client.name || '');
-          await sendEvolutionMessage(client, personalizedText, base64Media, mimeType);
+          await sendEvolutionMessage(client, personalizedText, waSettings, base64Media, mimeType);
           setSendStatuses(prev => ({ ...prev, [client.id]: 'success' }));
           successCount++;
         } catch (e: any) {

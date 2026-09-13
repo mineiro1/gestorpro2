@@ -82,7 +82,7 @@ export const sendMetaMessage = async (phone: string, text: string, waSettings: a
   if (baseUrl && !baseUrl.startsWith('http')) {
     baseUrl = 'https://' + baseUrl;
   }
-  const isWame = baseUrl.includes('api-wa.me') || baseUrl.includes('wame.api.br');
+  const isWame = baseUrl && !baseUrl.includes('graph.facebook.com');
   
   let url, headers, body;
   if (isWame) {
@@ -126,7 +126,7 @@ export const sendMetaMessage = async (phone: string, text: string, waSettings: a
         throw new Error("Janela de 24h fechada. A Meta (WhatsApp) bloqueou esta mensagem. Para iniciar a conversa, o cliente deve te enviar uma mensagem primeiro ou você deve usar Templates aprovados.");
     }
     
-    throw new Error(`Erro na API Oficial Meta (${response.status}): ${errDesc}`);
+    throw new Error(`Erro na API WAME/Meta (${response.status}): ${errDesc}`);
   }
   return await response.json();
 };
