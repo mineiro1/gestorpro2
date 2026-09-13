@@ -186,7 +186,15 @@ export default function Messages() {
       return;
     }
 
-    const waSettings = userProfile?.whatsappSettings;
+    let waSettings = userProfile?.whatsappSettings;
+    if (userProfile?.uid) {
+      const adminId = userProfile.role === 'admin' ? userProfile.uid : userProfile.adminId;
+      const { data } = await supabase.from('users').select('whatsapp_settings').eq('id', adminId).single();
+      if (data && data.whatsapp_settings) {
+        waSettings = data.whatsapp_settings;
+      }
+    }
+    
     const isEvolution = waSettings?.useEvolutionApi;
 
     if (!isEvolution && mediaFile) {
@@ -296,7 +304,7 @@ export default function Messages() {
         setSendStatuses(prev => ({ ...prev, [client.id]: 'sending' }));
         try {
           const personalizedText = messageText.replace(/\{nome\}/g, client.name || '');
-          await sendMetaMessage(client.phone, personalizedText, userProfile?.whatsappSettings || {});
+          await sendMetaMessage(client.phone, personalizedText, waSettings || {});
           setSendStatuses(prev => ({ ...prev, [client.id]: 'success' }));
           successCount++;
         } catch (e: any) {

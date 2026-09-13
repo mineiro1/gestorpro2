@@ -758,7 +758,15 @@ export default function RoutesPage() {
             let message = useMessage2 ? msg2 : msg1;
             message = message.replace(/{nome}/g, clientName).replace(/{telefone}/g, cleanPhone);
             
-            if (waSettings.useSmsForReports) {
+            let currentSettings = waSettings;
+            if (userProfile?.uid) {
+              const { data } = await supabase.from('users').select('whatsapp_settings').eq('id', adminId).single();
+              if (data && data.whatsapp_settings) {
+                currentSettings = { ...waSettings, ...data.whatsapp_settings };
+              }
+            }
+
+            if (currentSettings.useSmsForReports) {
               // Envia para a fila de SMS (Gateway)
               await supabase.from('sms_queue').insert({
                 admin_id: adminId,
@@ -766,11 +774,11 @@ export default function RoutesPage() {
                 message: message
               });
               console.log('Mensagem de relatório adicionada à fila de SMS.');
-            } else if (waSettings.useMetaApi) {
-              await sendMetaMessage(clientPhone, message, waSettings);
+            } else if (currentSettings.useMetaApi) {
+              await sendMetaMessage(clientPhone, message, currentSettings);
               // Não bloqueia a tela com alert
-            } else if (waSettings.useEvolutionApi) {
-              await sendEvolutionMessage(clientPhone, message, waSettings);
+            } else if (currentSettings.useEvolutionApi) {
+              await sendEvolutionMessage(clientPhone, message, currentSettings);
               // Não bloqueia a tela com alert
             } else {
               openWhatsApp(clientPhone, message);

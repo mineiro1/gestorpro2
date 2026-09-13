@@ -305,6 +305,15 @@ export default function Billing() {
   }, [selectedClientId, userProfile]);
 
   const handleSendWhatsApp = async (client: ClientBilling) => {
+    let currentSettings = waSettings;
+    if (userProfile?.uid) {
+      const adminId = userProfile.role === 'admin' ? userProfile.uid : userProfile.adminId;
+      const { data } = await supabase.from('users').select('whatsapp_settings').eq('id', adminId).single();
+      if (data && data.whatsapp_settings) {
+        currentSettings = { ...waSettings, ...data.whatsapp_settings };
+      }
+    }
+
     if (!client.phone) {
       alert(`O cliente ${client.name} não possui telefone cadastrado.`);
       return;
@@ -322,9 +331,9 @@ export default function Billing() {
       ? processMessageTemplate(waSettings.delayedMessage, client)
       : processMessageTemplate(waSettings.reminderMessage, client);
 
-    if (waSettings.useMetaApi) {
+    if (currentSettings.useMetaApi) {
       try {
-        await sendMetaMessage(client.phone, message, waSettings);
+        await sendMetaMessage(client.phone, message, currentSettings);
         setSentClients(prev => ({ ...prev, [client.id]: 'success' }));
         alert(`Mensagem enviada com sucesso para ${client.name} (via WhatsApp Oficial Meta)!`);
       } catch (error: any) {
@@ -332,9 +341,9 @@ export default function Billing() {
         console.error(error);
         alert(`Falha ao enviar via API Oficial para ${client.name}:\n\n${error.message}\n\nLembre-se: Para enviar textos livres, o cliente precisa ter te enviado uma mensagem nas últimas 24 horas.`);
       }
-    } else if (waSettings.useEvolutionApi) {
+    } else if (currentSettings.useEvolutionApi) {
       try {
-        await sendEvolutionMessage(client.phone, message, waSettings);
+        await sendEvolutionMessage(client.phone, message, currentSettings);
         setSentClients(prev => ({ ...prev, [client.id]: 'success' }));
         alert(`Mensagem enviada com sucesso para ${client.name}!`);
       } catch (error: any) {
@@ -350,17 +359,26 @@ export default function Billing() {
   };
 
   const processQueue = async (clients: ClientBilling[], silent = false) => {
-    if (waSettings.useMetaApi || waSettings.useEvolutionApi) {
-      if (waSettings.useEvolutionApi && (!waSettings.evolutionApiUrl || !waSettings.evolutionApiKey || !waSettings.evolutionInstanceName)) {
+    let currentSettings = waSettings;
+    if (userProfile?.uid) {
+      const adminId = userProfile.role === 'admin' ? userProfile.uid : userProfile.adminId;
+      const { data } = await supabase.from('users').select('whatsapp_settings').eq('id', adminId).single();
+      if (data && data.whatsapp_settings) {
+        currentSettings = { ...waSettings, ...data.whatsapp_settings };
+      }
+    }
+
+    if (currentSettings.useMetaApi || currentSettings.useEvolutionApi) {
+      if (currentSettings.useEvolutionApi && (!currentSettings.evolutionApiUrl || !currentSettings.evolutionApiKey || !currentSettings.evolutionInstanceName)) {
         if(!silent) alert("Credenciais da Evolution API incompletas nas configurações.");
         return;
       }
-      if (waSettings.useMetaApi && !waSettings.metaToken) {
+      if (currentSettings.useMetaApi && !currentSettings.metaToken) {
         if(!silent) alert("Credenciais da API Oficial (Meta) incompletas nas configurações. O Token/Key é obrigatório.");
         return;
       }
 
-      const apiName = waSettings.useMetaApi ? "API Oficial do WhatsApp (Meta)" : "Evolution API";
+      const apiName = currentSettings.useMetaApi ? "API Oficial do WhatsApp (Meta)" : "Evolution API";
       if (!silent && !confirm(`Deseja enviar ${clients.length} mensagens automaticamente via ${apiName}?`)) return;
       
       setSendingBatch(true);
@@ -394,10 +412,10 @@ export default function Billing() {
           : processMessageTemplate(waSettings.reminderMessage, client);
           
         try {
-          if (waSettings.useMetaApi) {
-            await sendMetaMessage(client.phone, message, waSettings);
+          if (currentSettings.useMetaApi) {
+            await sendMetaMessage(client.phone, message, currentSettings);
           } else {
-            await sendEvolutionMessage(client.phone, message, waSettings);
+            await sendEvolutionMessage(client.phone, message, currentSettings);
           }
           successCount++;
           setSentClients(prev => ({ ...prev, [client.id]: 'success' }));

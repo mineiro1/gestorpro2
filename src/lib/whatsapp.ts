@@ -22,7 +22,10 @@ export const sendEvolutionMessage = async (phone: string, text: string, waSettin
   const cleanPhone = phone.replace(/\D/g, '');
   const number = cleanPhone.startsWith('55') ? cleanPhone : `55${cleanPhone}`;
   
-  const baseUrl = waSettings.evolutionApiUrl.replace(/\/$/, '');
+  let baseUrl = waSettings.evolutionApiUrl.trim().replace(/\/$/, '');
+  if (baseUrl && !baseUrl.startsWith('http')) {
+    baseUrl = 'https://' + baseUrl;
+  }
   const url = `${baseUrl}/message/sendText/${waSettings.evolutionInstanceName}`;
   
   let response;
@@ -64,6 +67,10 @@ export const sendEvolutionMessage = async (phone: string, text: string, waSettin
 };
 
 export const sendMetaMessage = async (phone: string, text: string, waSettings: any) => {
+  console.log("SEND META MESSAGE CALLED");
+  console.log("Phone:", phone);
+  console.log("Base URL raw:", waSettings.metaServerUrl);
+  console.log("Token:", waSettings.metaToken);
   if (!waSettings.metaToken) {
     throw new Error("O Token/Key da API Oficial (Meta) é obrigatório.");
   }
@@ -71,7 +78,10 @@ export const sendMetaMessage = async (phone: string, text: string, waSettings: a
   const cleanPhone = phone.replace(/\D/g, '');
   const number = cleanPhone.startsWith('55') ? cleanPhone : `55${cleanPhone}`;
   
-  const baseUrl = (waSettings.metaServerUrl || 'https://graph.facebook.com/v19.0').replace(/\/$/, '');
+  let baseUrl = (waSettings.metaServerUrl || 'https://graph.facebook.com/v19.0').trim().replace(/\/$/, '');
+  if (baseUrl && !baseUrl.startsWith('http')) {
+    baseUrl = 'https://' + baseUrl;
+  }
   const isWame = baseUrl.includes('api-wa.me') || baseUrl.includes('wame.api.br');
   
   let url, headers, body;
