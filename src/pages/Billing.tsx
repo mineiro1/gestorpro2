@@ -63,7 +63,8 @@ export default function Billing() {
     evolutionInstanceName: '',
     useMetaApi: false,
     metaToken: '',
-    metaPhoneNumberId: ''
+    metaPhoneNumberId: '',
+    metaServerUrl: ''
   });
 
   useEffect(() => {
@@ -81,7 +82,8 @@ export default function Billing() {
         evolutionInstanceName: userProfile.whatsappSettings.evolutionInstanceName || '',
         useMetaApi: userProfile.whatsappSettings.useMetaApi || false,
         metaToken: userProfile.whatsappSettings.metaToken || '',
-        metaPhoneNumberId: userProfile.whatsappSettings.metaPhoneNumberId || ''
+        metaPhoneNumberId: userProfile.whatsappSettings.metaPhoneNumberId || '',
+        metaServerUrl: userProfile.whatsappSettings.metaServerUrl || ''
       });
     }
   }, [userProfile]);
