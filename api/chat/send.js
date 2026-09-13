@@ -27,6 +27,36 @@ export default async function handler(req, res) {
          const errText = await response.text();
          console.error("Evolution Send Error:", errText);
       }
+    } else if (waSettings?.useMetaApi && waSettings?.metaToken) {
+      const cleanPhone = clientPhone.replace(/\D/g, '');
+      const number = cleanPhone.startsWith('55') ? cleanPhone : `55${cleanPhone}`;
+      
+      const baseUrl = (waSettings.metaServerUrl || 'https://graph.facebook.com/v19.0').replace(/\/$/, '');
+      const phoneId = waSettings.metaPhoneNumberId ? `/${waSettings.metaPhoneNumberId}` : '';
+      const url = `${baseUrl}${phoneId}/messages`;
+      
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${waSettings.metaToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          messaging_product: "whatsapp",
+          recipient_type: "individual",
+          to: number,
+          type: "text",
+          text: { 
+            preview_url: false,
+            body: text
+          }
+        })
+      });
+      
+      if (!response.ok) {
+         const errText = await response.text();
+         console.error("Meta Send Error:", errText);
+      }
     }
     
     res.json({ success: true });

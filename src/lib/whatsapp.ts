@@ -64,14 +64,16 @@ export const sendEvolutionMessage = async (phone: string, text: string, waSettin
 };
 
 export const sendMetaMessage = async (phone: string, text: string, waSettings: any) => {
-  if (!waSettings.metaToken || !waSettings.metaPhoneNumberId) {
-    throw new Error("Credenciais da API Oficial (Meta) incompletas nas configurações.");
+  if (!waSettings.metaToken) {
+    throw new Error("O Token/Key da API Oficial (Meta) é obrigatório.");
   }
   
   const cleanPhone = phone.replace(/\D/g, '');
   const number = cleanPhone.startsWith('55') ? cleanPhone : `55${cleanPhone}`;
   
-  const url = `https://graph.facebook.com/v19.0/${waSettings.metaPhoneNumberId}/messages`;
+  const baseUrl = (waSettings.metaServerUrl || 'https://graph.facebook.com/v19.0').replace(/\/$/, '');
+  const phoneId = waSettings.metaPhoneNumberId ? `/${waSettings.metaPhoneNumberId}` : '';
+  const url = `${baseUrl}${phoneId}/messages`;
   
   let response;
   try {

@@ -33,6 +33,7 @@ export interface UserProfile {
     evolutionInstanceName?: string;
     useMetaApi?: boolean;
     metaToken?: string;
+    metaServerUrl?: string;
     metaPhoneNumberId?: string;
   };
 }
