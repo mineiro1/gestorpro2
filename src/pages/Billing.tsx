@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
-import { openWhatsApp } from '../lib/whatsapp';
+import { openWhatsApp, sendMetaMessage, sendEvolutionMessage } from '../lib/whatsapp';
 import { MessageCircle, AlertCircle, Clock, History, Settings, X, Play, MessageSquare, Calendar, CheckCircle, XCircle, DollarSign } from 'lucide-react';
 
 interface ClientBilling {

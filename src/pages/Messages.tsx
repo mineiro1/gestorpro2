@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
-import { openWhatsApp } from '../lib/whatsapp';
+import { openWhatsApp, sendMetaMessage, sendEvolutionMessage } from '../lib/whatsapp';
 import { MessageCircle, CheckSquare, Square, Image as ImageIcon, Video, X, Play } from 'lucide-react';
 import { useRealtimeUpdates } from '../hooks/useRealtimeUpdates';
 
