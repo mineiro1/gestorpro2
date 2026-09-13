@@ -572,6 +572,40 @@ export default function RoutesPage() {
     }
   };
 
+    const handleOpenChat = async (client: any, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    
+    let visitId = null;
+    const adminId = isAdmin ? userProfile.uid : userProfile.adminId;
+    
+    try {
+      const { data: existingVisit } = await supabase.from('visits')
+        .select('id')
+        .eq('client_id', client.id)
+        .eq('date', routeDate)
+        .limit(1);
+        
+      if (existingVisit && existingVisit.length > 0) {
+         visitId = existingVisit[0].id;
+      } else {
+         const { data: newVisit } = await supabase.from('visits').insert({
+           admin_id: adminId,
+           client_id: client.id,
+           employee_id: selectedEmployee || userProfile.uid,
+           date: routeDate,
+           status: 'agendada'
+         }).select('id').single();
+         if (newVisit) visitId = newVisit.id;
+      }
+    } catch(err) {
+      console.error(err);
+    }
+
+    setActiveChatVisit({ id: visitId });
+    setActiveChatClient(client);
+    setChatModalOpen(true);
+  };
+
   const handleOpenReport = (client: any) => {
     if (completedVisitsOnRouteDate.has(client.id)) return;
     setSelectedClientForReport(client);
@@ -764,7 +798,16 @@ export default function RoutesPage() {
       if (checklist.motorLigado) checkedItems.push('O motor ficou ligado filtrando');
       if (checklist.ausente) checkedItems.push('Cliente ausente, não foi possivel executar o serviço.');
       
-      const checklistText = checkedItems.length > 0 ? `\n\nTarefas realizadas:\n- ${checkedItems.join('\n- ')}` : '';
+      
+    // Fechamento Automático do Chat (Por Ação)
+    try {
+      await supabase.from('chat_sessions')
+        .update({ status: 'closed', closed_at: new Date().toISOString() })
+        .eq('client_id', selectedClientForReport.id)
+        .eq('status', 'open');
+    } catch(e) {}
+
+            const checklistText = checkedItems.length > 0 ? `\n\nTarefas realizadas:\n- ${checkedItems.join('\n- ')}` : '';
       
       const paramItems = [];
       if (parameters.cloro) paramItems.push(`Cloro: ${parameters.cloro}`);
@@ -1218,6 +1261,15 @@ export default function RoutesPage() {
                             title="Abrir no Google Maps"
                           >
                             <MapPin size={20} />
+                          </button>
+                          
+                          {/* Botão Estou a caminho / Chat */}
+                          <button
+                            onClick={(e) => handleOpenChat(client, e)}
+                            className="p-1 text-blue-600 hover:bg-blue-100 rounded-md transition-colors"
+                            title="Avisar chegada / Chat"
+                          >
+                            <MessageCircle size={20} />
                           </button>
                         </div>
                         {isCompleted && (

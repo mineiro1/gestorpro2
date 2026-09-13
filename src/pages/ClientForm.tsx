@@ -16,6 +16,7 @@ export default function ClientForm() {
     name: '',
     cpfCnpj: '',
     phone: '',
+    localPhone: '',
     address: '',
     monthlyFee: '',
     dueDate: '',
@@ -47,6 +48,7 @@ export default function ClientForm() {
               name: data.name || '',
               cpfCnpj: data.cpf_cnpj || data.cpfCnpj || '',
               phone: data.phone || '',
+              localPhone: data.local_phone || '',
               address: data.address || '',
               monthlyFee: data.monthly_price?.toString() || data.monthlyFee?.toString() || '',
               dueDate: data.due_date?.toString() || data.dueDate?.toString() || '',
@@ -128,6 +130,7 @@ export default function ClientForm() {
       name: formData.name,
       cpf_cnpj: formData.cpfCnpj,
       phone: formData.phone,
+      local_phone: formData.localPhone,
       address: formData.address,
       monthly_price: parseFloat(formData.monthlyFee) || 0,
       due_date: formData.dueDate, // Now a string YYYY-MM-DD
@@ -275,7 +278,8 @@ export default function ClientForm() {
           name: '',
           cpfCnpj: '',
           phone: '',
-          address: '',
+    localPhone: '',
+    address: '',
           monthlyFee: '',
           dueDate: '',
           visitDays: [],
@@ -383,6 +387,18 @@ export default function ClientForm() {
                 required
                 value={formData.name}
                 onChange={e => setFormData({...formData, name: e.target.value})}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary outline-none"
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Contato no Local (Opcional - Caseiro/Portaria)
+              </label>
+              <input
+                type="tel"
+                value={formData.localPhone}
+                onChange={e => setFormData({...formData, localPhone: e.target.value})}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary outline-none"
               />
             </div>
