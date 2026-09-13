@@ -211,6 +211,7 @@ async function processPayment(paymentId, adminId) {
   // Webhook for incoming messages
   app.post("/api/webhook/evolution", async (req, res) => {
     try {
+      console.log("Evolution Webhook Received:", JSON.stringify(req.body));
       const body = req.body;
       
       // Evolution API format usually comes in body.data for messages
