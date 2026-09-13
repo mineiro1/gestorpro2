@@ -163,19 +163,8 @@ async function processPayment(paymentId, adminId) {
   
   app.post("/api/chat/send", async (req, res) => {
     try {
-      const { sessionId, text, clientPhone, waSettings } = req.body;
-      if (!sessionId || !text || !clientPhone) return res.status(400).json({error: "Missing fields"});
-
-      // Save to db first
-      const { data: msg, error } = await supabaseAdmin
-        .from('chat_messages')
-        .insert({
-           session_id: sessionId,
-           sender_type: 'tech',
-           content: text
-        }).select().single();
-      
-      if (error) console.error("Error saving message", error);
+      const { text, clientPhone, waSettings } = req.body;
+      if (!text || !clientPhone) return res.status(400).json({error: "Missing fields"});
 
       // Now send via Evolution API
       if (waSettings?.useEvolutionApi && waSettings?.evolutionApiUrl && waSettings?.evolutionApiKey && waSettings?.evolutionInstanceName) {
@@ -201,7 +190,7 @@ async function processPayment(paymentId, adminId) {
           // Meta API fallback if they use Meta instead
       }
       
-      res.json({ success: true, message: msg });
+      res.json({ success: true });
     } catch(e) {
       console.error(e);
       res.status(500).json({ error: e.message });
