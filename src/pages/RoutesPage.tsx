@@ -32,6 +32,10 @@ export default function RoutesPage() {
   const [routeDate, setRouteDate] = useState(getLocalISODate());
 
   const [generated, setGenerated] = useState(false);
+  const [chatModalOpen, setChatModalOpen] = useState(false);
+  const [activeChatVisit, setActiveChatVisit] = useState<any>(null);
+  const [activeChatClient, setActiveChatClient] = useState<any>(null);
+
 
   const [highlightedClientId, setHighlightedClientId] = useState<string | null>(null);
 
@@ -575,7 +579,15 @@ export default function RoutesPage() {
   };
 
     const handleOpenChat = async (client: any, e?: React.MouseEvent) => {
-    if (e) e.stopPropagation();
+    if (e) {
+      e.stopPropagation();
+      e.preventDefault();
+    }
+    console.log("Chat button clicked for client:", client?.id);
+    
+    // Open modal instantly for better UX
+    setActiveChatClient(client);
+    setChatModalOpen(true);
     
     let visitId = null;
     const adminId = isAdmin ? userProfile.uid : userProfile.adminId;
@@ -1611,6 +1623,14 @@ export default function RoutesPage() {
         </div>
       )}
 
+
+      <ChatModal 
+        isOpen={chatModalOpen} 
+        onClose={() => setChatModalOpen(false)} 
+        visit={activeChatVisit} 
+        client={activeChatClient} 
+        waSettings={(userProfile?.whatsappSettings as any)}
+      />
     </div>
   );
 }
