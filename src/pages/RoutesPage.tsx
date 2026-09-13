@@ -261,18 +261,18 @@ export default function RoutesPage() {
       const routeDateEndStr = end.toISOString();
       
       const { data: visitsByTime } = await supabase.from('visits')
-        .select('client_id')
+        .select('client_id, status')
         .eq('admin_id', adminId)
         .eq('time', activeRouteDate);
         
       const { data: visitsByDate } = await supabase.from('visits')
-        .select('client_id')
+        .select('client_id, status')
         .eq('admin_id', adminId)
         .gte('date', routeDateStartStr)
         .lte('date', routeDateEndStr);
         
       const { data: visitsByCreated } = await supabase.from('visits')
-        .select('client_id')
+        .select('client_id, status')
         .eq('admin_id', adminId)
         .gte('created_at', routeDateStartStr)
         .lte('created_at', routeDateEndStr);
@@ -282,7 +282,9 @@ export default function RoutesPage() {
       const completedIds = new Set();
       if (visitsSnap) {
         visitsSnap.forEach(data => {
-            completedIds.add(data.client_id);
+            if (data.status !== 'agendada') {
+               completedIds.add(data.client_id);
+            }
         });
       }
       
@@ -868,16 +870,40 @@ export default function RoutesPage() {
             if (oneOffError) throw oneOffError;
           } else {
             // Normal Client Visit
-            const { error: insertError } = await supabase.from('visits').insert({
-              admin_id: adminId,
-              client_id: selectedClientForReport.id,
-              employee_id: payload.employeeId,
-              date: finalVisitDate,
-              time: activeRouteDate,
-              notes: finalNotes,
-              photo_urls: reportPhotos,
-              location: locationData
-            });
+
+            // Check if there's an 'agendada' visit for today
+            const { data: existingAgendada } = await supabase.from('visits')
+              .select('id')
+              .eq('client_id', selectedClientForReport.id)
+              .eq('date', routeDate) // this was used to insert the agendada
+              .limit(1);
+
+            let insertError = null;
+            if (existingAgendada && existingAgendada.length > 0) {
+              const { error } = await supabase.from('visits').update({
+                date: finalVisitDate,
+                time: activeRouteDate,
+                notes: finalNotes,
+                photo_urls: reportPhotos,
+                location: locationData,
+                status: 'finalizada'
+              }).eq('id', existingAgendada[0].id);
+              insertError = error;
+            } else {
+              const { error } = await supabase.from('visits').insert({
+                admin_id: adminId,
+                client_id: selectedClientForReport.id,
+                employee_id: payload.employeeId,
+                date: finalVisitDate,
+                time: activeRouteDate,
+                notes: finalNotes,
+                photo_urls: reportPhotos,
+                location: locationData,
+                status: 'finalizada'
+              });
+              insertError = error;
+            }
+
             
             if (insertError) throw insertError;
             
