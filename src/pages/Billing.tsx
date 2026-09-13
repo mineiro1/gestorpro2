@@ -1120,7 +1120,7 @@ export default function Billing() {
                       <div className="bg-white p-3 rounded border border-blue-200">
                         <p className="text-xs font-semibold text-gray-500 mb-1">URL DO WEBHOOK:</p>
                         <code className="text-sm text-gray-800 break-all select-all">
-                          https://ais-pre-lafhr3cxydhbm5z265hztr-86812857430.us-east1.run.app/api/webhook/evolution
+                          {window.location.origin}/api/webhook/evolution
                         </code>
                         <p className="text-xs text-gray-500 mt-2"><b>Eventos necessários:</b> messages-upsert</p>
                       </div>
