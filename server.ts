@@ -188,6 +188,7 @@ async function processPayment(paymentId, adminId) {
           },
           body: JSON.stringify({
             number: `55${cleanPhone}`,
+            text: text,
             options: { delay: 1200, presence: 'composing' },
             textMessage: { text: text }
           })
