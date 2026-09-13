@@ -3,29 +3,58 @@ import re
 with open('src/lib/whatsapp.ts', 'r') as f:
     content = f.read()
 
-old_code = """export const sendMetaMessage = async (phone: string, text: string, waSettings: any) => {
-  if (!waSettings.metaToken || !waSettings.metaPhoneNumberId) {
-    throw new Error("Credenciais da API Oficial (Meta) incompletas nas configurações.");
-  }
-  
-  const cleanPhone = phone.replace(/\\D/g, '');
-  const number = cleanPhone.startsWith('55') ? cleanPhone : `55${cleanPhone}`;
-  
-  const url = `https://graph.facebook.com/v19.0/${waSettings.metaPhoneNumberId}/messages`;"""
-
-new_code = """export const sendMetaMessage = async (phone: string, text: string, waSettings: any) => {
-  if (!waSettings.metaToken) {
-    throw new Error("O Token/Key da API Oficial (Meta) é obrigatório.");
-  }
-  
-  const cleanPhone = phone.replace(/\\D/g, '');
-  const number = cleanPhone.startsWith('55') ? cleanPhone : `55${cleanPhone}`;
-  
-  const baseUrl = (waSettings.metaServerUrl || 'https://graph.facebook.com/v19.0').replace(/\\/$/, '');
+old_code = """  const baseUrl = (waSettings.metaServerUrl || 'https://graph.facebook.com/v19.0').replace(/\\/$/, '');
   const phoneId = waSettings.metaPhoneNumberId ? `/${waSettings.metaPhoneNumberId}` : '';
-  const url = `${baseUrl}${phoneId}/messages`;"""
+  const url = `${baseUrl}${phoneId}/messages`;
+  
+  let response;
+  try {
+    response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${waSettings.metaToken}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        recipient_type: "individual",
+        to: number,
+        type: "text",
+        text: { 
+          preview_url: false,
+          body: text
+        }
+      })
+    });"""
+
+new_code = """  const baseUrl = (waSettings.metaServerUrl || 'https://graph.facebook.com/v19.0').replace(/\\/$/, '');
+  const isWame = baseUrl.includes('api-wa.me') || baseUrl.includes('wame.api.br');
+  
+  let url, headers, body;
+  if (isWame) {
+     url = `${baseUrl}/${waSettings.metaToken}/message/text`;
+     headers = { 'Content-Type': 'application/json' };
+     body = JSON.stringify({ to: number, text: text });
+  } else {
+     const phoneId = waSettings.metaPhoneNumberId ? `/${waSettings.metaPhoneNumberId}` : '';
+     url = `${baseUrl}${phoneId}/messages`;
+     headers = {
+        'Authorization': `Bearer ${waSettings.metaToken}`,
+        'Content-Type': 'application/json'
+     };
+     body = JSON.stringify({
+        messaging_product: "whatsapp",
+        recipient_type: "individual",
+        to: number,
+        type: "text",
+        text: { preview_url: false, body: text }
+     });
+  }
+  
+  let response;
+  try {
+    response = await fetch(url, { method: 'POST', headers, body });"""
 
 content = content.replace(old_code, new_code)
-
 with open('src/lib/whatsapp.ts', 'w') as f:
     f.write(content)

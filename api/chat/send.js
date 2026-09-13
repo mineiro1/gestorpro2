@@ -32,30 +32,39 @@ export default async function handler(req, res) {
       const number = cleanPhone.startsWith('55') ? cleanPhone : `55${cleanPhone}`;
       
       const baseUrl = (waSettings.metaServerUrl || 'https://graph.facebook.com/v19.0').replace(/\/$/, '');
-      const phoneId = waSettings.metaPhoneNumberId ? `/${waSettings.metaPhoneNumberId}` : '';
-      const url = `${baseUrl}${phoneId}/messages`;
+      const isWame = baseUrl.includes('api-wa.me') || baseUrl.includes('wame.api.br');
+      
+      let url, headers, body;
+      
+      if (isWame) {
+         url = `${baseUrl}/${waSettings.metaToken}/message/text`;
+         headers = { 'Content-Type': 'application/json' };
+         body = JSON.stringify({ to: number, text: text });
+      } else {
+         const phoneId = waSettings.metaPhoneNumberId ? `/${waSettings.metaPhoneNumberId}` : '';
+         url = `${baseUrl}${phoneId}/messages`;
+         headers = {
+            'Authorization': `Bearer ${waSettings.metaToken}`,
+            'Content-Type': 'application/json'
+         };
+         body = JSON.stringify({
+            messaging_product: "whatsapp",
+            recipient_type: "individual",
+            to: number,
+            type: "text",
+            text: { preview_url: false, body: text }
+         });
+      }
       
       const response = await fetch(url, {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${waSettings.metaToken}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          messaging_product: "whatsapp",
-          recipient_type: "individual",
-          to: number,
-          type: "text",
-          text: { 
-            preview_url: false,
-            body: text
-          }
-        })
+        headers,
+        body
       });
       
       if (!response.ok) {
          const errText = await response.text();
-         console.error("Meta Send Error:", errText);
+         console.error("Meta/WAME Send Error:", errText);
       }
     }
     

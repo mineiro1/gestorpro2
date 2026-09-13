@@ -129,105 +129,8 @@ export default function Billing() {
     return message;
   };
 
-  const sendEvolutionMessage = async (client: ClientBilling, text: string) => {
-    if (!waSettings.evolutionApiUrl || !waSettings.evolutionApiKey || !waSettings.evolutionInstanceName) {
-      throw new Error("Credenciais da Evolution API incompletas nas configurações.");
-    }
-    
-    const cleanPhone = client.phone.replace(/\D/g, '');
-    const number = cleanPhone.startsWith('55') ? cleanPhone : `55${cleanPhone}`;
-    
-    // Remove trailing slash if present
-    const baseUrl = waSettings.evolutionApiUrl.replace(/\/$/, '');
-    const url = `${baseUrl}/message/sendText/${waSettings.evolutionInstanceName}`;
-    
-    let response;
-    try {
-      response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'apikey': waSettings.evolutionApiKey
-        },
-        body: JSON.stringify({
-          number: number,
-          text: text,
-          textMessage: {
-            text: text
-          },
-          options: {
-            delay: 1000,
-            presence: "composing"
-          }
-        })
-      });
-    } catch (e: any) {
-      if (e.message === 'Failed to fetch') {
-        throw new Error(`Falha de conexão. Verifique se o seu servidor Evolution API (${baseUrl}) possui o CORS habilitado. O navegador bloqueou a requisição (Failed to fetch).`);
-      }
-      throw e;
-    }
-    
-    if (!response.ok) {
-      let errDesc = 'Desconhecido';
-      try {
-        const errData = await response.json();
-        errDesc = JSON.stringify(errData);
-      } catch(e) {}
-      throw new Error(`Erro na Evolution API (${response.status}): ${errDesc}`);
-    }
-    return await response.json();
-  };
-
-  const sendMetaMessage = async (client: ClientBilling, text: string) => {
-    if (!waSettings.metaToken) {
-      throw new Error("O Token/Key da API Oficial (Meta) é obrigatório.");
-    }
-    
-    const cleanPhone = client.phone.replace(/\D/g, '');
-    const number = cleanPhone.startsWith('55') ? cleanPhone : `55${cleanPhone}`;
-    
-    const baseUrl = (waSettings.metaServerUrl || 'https://graph.facebook.com/v19.0').replace(/\/$/, '');
-    const phoneId = waSettings.metaPhoneNumberId ? `/${waSettings.metaPhoneNumberId}` : '';
-    const url = `${baseUrl}${phoneId}/messages`;
-    
-    let response;
-    try {
-      response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${waSettings.metaToken}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          messaging_product: "whatsapp",
-          recipient_type: "individual",
-          to: number,
-          type: "text",
-          text: { 
-            preview_url: false,
-            body: text
-          }
-        })
-      });
-    } catch (e: any) {
-      if (e.message === 'Failed to fetch') {
-        throw new Error('Falha de conexão com a API da Meta. (Failed to fetch)');
-      }
-      throw e;
-    }
-    
-    if (!response.ok) {
-      let errDesc = 'Desconhecido';
-      try {
-        const errData = await response.json();
-        errDesc = errData.error?.message || JSON.stringify(errData);
-      } catch(e) {}
-      throw new Error(`Erro na API Oficial Meta (${response.status}): ${errDesc}`);
-    }
-    return await response.json();
-  };
-
+  
+  
   useEffect(() => {
     if (!userProfile?.uid) return;
 
@@ -419,7 +322,7 @@ export default function Billing() {
 
     if (waSettings.useMetaApi) {
       try {
-        await sendMetaMessage(client, message);
+        await sendMetaMessage(client.phone, message, waSettings);
         setSentClients(prev => ({ ...prev, [client.id]: 'success' }));
         alert(`Mensagem enviada com sucesso para ${client.name} (via WhatsApp Oficial Meta)!`);
       } catch (error: any) {
@@ -429,7 +332,7 @@ export default function Billing() {
       }
     } else if (waSettings.useEvolutionApi) {
       try {
-        await sendEvolutionMessage(client, message);
+        await sendEvolutionMessage(client.phone, message, waSettings);
         setSentClients(prev => ({ ...prev, [client.id]: 'success' }));
         alert(`Mensagem enviada com sucesso para ${client.name}!`);
       } catch (error: any) {
@@ -490,9 +393,9 @@ export default function Billing() {
           
         try {
           if (waSettings.useMetaApi) {
-            await sendMetaMessage(client, message);
+            await sendMetaMessage(client.phone, message, waSettings);
           } else {
-            await sendEvolutionMessage(client, message);
+            await sendEvolutionMessage(client.phone, message, waSettings);
           }
           successCount++;
           setSentClients(prev => ({ ...prev, [client.id]: 'success' }));
@@ -1070,8 +973,8 @@ export default function Billing() {
                         onChange={() => setWaSettings({...waSettings, useEvolutionApi: false, useMetaApi: true})}
                       />
                       <div>
-                        <span className="block font-semibold text-sm text-gray-800 text-blue-900">API Oficial Meta (Cloud API)</span>
-                        <span className="block text-xs text-gray-600">Conexão oficial via painel Developers Facebook. Ultra seguro, sem risco de banimento.</span>
+                        <span className="block font-semibold text-sm text-blue-900">API WAME / Meta Cloud API</span>
+                        <span className="block text-xs text-gray-600">Conexão via Facebook Developers ou WAME API (Oficial e Não-Oficial via QR Code).</span>
                       </div>
                     </label>
                   </div>
@@ -1132,7 +1035,7 @@ export default function Billing() {
 
                 {waSettings.useMetaApi && (
                   <div className="space-y-4 bg-blue-50/50 p-4 rounded-lg border border-blue-100 animate-fade-in">
-                    <h5 className="text-sm font-bold text-blue-900">Credenciais Meta Cloud API</h5>
+                    <h5 className="text-sm font-bold text-blue-900">Credenciais WAME / Meta API</h5>
                     <p className="text-xs text-blue-700 mb-2 font-medium">Aviso: Textos livres só chegam se o cliente acionou você nas últimas 24h. Use templates aprovados para o 1º contato (não incluso na demo de texto livre).</p>
                     <div>
                       <label className="block text-xs font-medium text-gray-700 mb-1">Server URL (Opcional - deixe vazio para oficial)</label>

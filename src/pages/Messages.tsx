@@ -175,56 +175,7 @@ export default function Messages() {
     }
   };
 
-  const sendMetaMessage = async (client: any, text: string) => {
-    const waSettings = userProfile?.whatsappSettings;
-    if (!waSettings || !waSettings.metaToken) {
-      throw new Error("O Token/Key da API Oficial (Meta) é obrigatório.");
-    }
-    
-    const cleanPhone = client.phone.replace(/\D/g, '');
-    const number = cleanPhone.startsWith('55') ? cleanPhone : `55${cleanPhone}`;
-    
-    const baseUrl = (waSettings.metaServerUrl || 'https://graph.facebook.com/v19.0').replace(/\/$/, '');
-    const phoneId = waSettings.metaPhoneNumberId ? `/${waSettings.metaPhoneNumberId}` : '';
-    const url = `${baseUrl}${phoneId}/messages`;
-    
-    let response;
-    try {
-      response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${waSettings.metaToken}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          messaging_product: "whatsapp",
-          recipient_type: "individual",
-          to: number,
-          type: "text",
-          text: { 
-            preview_url: false,
-            body: text
-          }
-        })
-      });
-    } catch (e: any) {
-      if (e.message === 'Failed to fetch') {
-        throw new Error('Falha de conexão com a API da Meta. (Failed to fetch)');
-      }
-      throw e;
-    }
-    
-    if (!response.ok) {
-      let errDesc = 'Desconhecido';
-      try {
-        const errData = await response.json();
-        errDesc = errData.error?.message || JSON.stringify(errData);
-      } catch(e) {}
-      throw new Error(`Erro API Meta (${response.status}): ${errDesc}`);
-    }
-    return await response.json();
-  };
-
+  
   const handleSend = async () => {
     if (selectedClients.size === 0) {
       alert("Por favor, selecione pelo menos um cliente.");
@@ -345,7 +296,7 @@ export default function Messages() {
         setSendStatuses(prev => ({ ...prev, [client.id]: 'sending' }));
         try {
           const personalizedText = messageText.replace(/\{nome\}/g, client.name || '');
-          await sendMetaMessage(client, personalizedText);
+          await sendMetaMessage(client.phone, personalizedText, userProfile?.whatsappSettings || {});
           setSendStatuses(prev => ({ ...prev, [client.id]: 'success' }));
           successCount++;
         } catch (e: any) {

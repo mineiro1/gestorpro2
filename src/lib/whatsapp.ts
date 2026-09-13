@@ -72,28 +72,32 @@ export const sendMetaMessage = async (phone: string, text: string, waSettings: a
   const number = cleanPhone.startsWith('55') ? cleanPhone : `55${cleanPhone}`;
   
   const baseUrl = (waSettings.metaServerUrl || 'https://graph.facebook.com/v19.0').replace(/\/$/, '');
-  const phoneId = waSettings.metaPhoneNumberId ? `/${waSettings.metaPhoneNumberId}` : '';
-  const url = `${baseUrl}${phoneId}/messages`;
+  const isWame = baseUrl.includes('api-wa.me') || baseUrl.includes('wame.api.br');
   
-  let response;
-  try {
-    response = await fetch(url, {
-      method: 'POST',
-      headers: {
+  let url, headers, body;
+  if (isWame) {
+     url = `${baseUrl}/${waSettings.metaToken}/message/text`;
+     headers = { 'Content-Type': 'application/json' };
+     body = JSON.stringify({ to: number, text: text });
+  } else {
+     const phoneId = waSettings.metaPhoneNumberId ? `/${waSettings.metaPhoneNumberId}` : '';
+     url = `${baseUrl}${phoneId}/messages`;
+     headers = {
         'Authorization': `Bearer ${waSettings.metaToken}`,
         'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
+     };
+     body = JSON.stringify({
         messaging_product: "whatsapp",
         recipient_type: "individual",
         to: number,
         type: "text",
-        text: { 
-          preview_url: false,
-          body: text
-        }
-      })
-    });
+        text: { preview_url: false, body: text }
+     });
+  }
+  
+  let response;
+  try {
+    response = await fetch(url, { method: 'POST', headers, body });
   } catch (e: any) {
     if (e.message === 'Failed to fetch') {
       throw new Error('Falha de conexão com a API da Meta. (Failed to fetch)');
@@ -105,8 +109,13 @@ export const sendMetaMessage = async (phone: string, text: string, waSettings: a
     let errDesc = 'Desconhecido';
     try {
       const errData = await response.json();
-      errDesc = errData.error?.message || JSON.stringify(errData);
+      errDesc = errData.message || errData.error?.message || JSON.stringify(errData);
     } catch(e) {}
+    
+    if (response.status === 409 || errDesc.includes('24h') || errDesc.includes('Janela')) {
+        throw new Error("Janela de 24h fechada. A Meta (WhatsApp) bloqueou esta mensagem. Para iniciar a conversa, o cliente deve te enviar uma mensagem primeiro ou você deve usar Templates aprovados.");
+    }
+    
     throw new Error(`Erro na API Oficial Meta (${response.status}): ${errDesc}`);
   }
   return await response.json();
