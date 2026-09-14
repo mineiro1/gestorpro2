@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { supabase, secondarySupabase } from '../lib/supabase';
 import { History, Plus, X, Download } from 'lucide-react';
 import { openMap } from '../lib/maps';
+import { normalizePhoneNumber } from '../lib/whatsapp';
 
 const DAYS_OF_WEEK = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
 
@@ -129,8 +130,8 @@ export default function ClientForm() {
     const clientData = {
       name: formData.name,
       cpf_cnpj: formData.cpfCnpj,
-      phone: formData.phone,
-      local_phone: formData.localPhone,
+      phone: normalizePhoneNumber(formData.phone),
+      local_phone: normalizePhoneNumber(formData.localPhone),
       address: formData.address,
       monthly_price: parseFloat(formData.monthlyFee) || 0,
       due_date: formData.dueDate, // Now a string YYYY-MM-DD
@@ -147,7 +148,7 @@ export default function ClientForm() {
         
         if (formData.phone) {
           try {
-            const cleanPhone = formData.phone.replace(/\D/g, '');
+            const cleanPhone = clientData.phone;
             if (cleanPhone.length >= 10) {
               const email = `${cleanPhone}@gestaopro.com`;
               let authDataToUse = null;
@@ -200,7 +201,7 @@ export default function ClientForm() {
 
         if (formData.phone && newClientData) {
           try {
-            const cleanPhone = formData.phone.replace(/\D/g, '');
+            const cleanPhone = clientData.phone;
             if (cleanPhone.length >= 10) {
               const email = `${cleanPhone}@gestaopro.com`;
               let authDataToUse = null;
