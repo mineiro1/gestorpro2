@@ -80,12 +80,12 @@ async function startServer() {
           },
           external_reference: adminId, // We use this to identify the user on webhook
           back_urls: {
-            success: `${(process.env.PUBLIC_URL || origin || req.headers.origin || 'https://gestaopro.com')}/`,
-            failure: `${(process.env.PUBLIC_URL || origin || req.headers.origin || 'https://gestaopro.com')}/`,
-            pending: `${(process.env.PUBLIC_URL || origin || req.headers.origin || 'https://gestaopro.com')}/`
+            success: `${(process.env.PUBLIC_URL || origin || req.headers.origin || 'https://www.rspiscinas.app.br')}/`,
+            failure: `${(process.env.PUBLIC_URL || origin || req.headers.origin || 'https://www.rspiscinas.app.br')}/`,
+            pending: `${(process.env.PUBLIC_URL || origin || req.headers.origin || 'https://www.rspiscinas.app.br')}/`
           },
           auto_return: "approved",
-          notification_url: `${(process.env.PUBLIC_URL || origin || req.headers.origin || 'https://gestaopro.com')}/api/mp-webhook`
+          notification_url: `${(process.env.PUBLIC_URL || origin || req.headers.origin || 'https://www.rspiscinas.app.br')}/api/mp-webhook`
         }
       });
 
