@@ -306,11 +306,21 @@ async function processPayment(paymentId, adminId) {
          const lp = (c.local_phone || '').replace(/\D/g, '');
          if (!cp && !lp) return false;
          
+         // Helper function to safely get the last 8 digits of a number for robust Brazilian matching
+         // This bypasses issues with DDI (55), DDD, and the presence/absence of the 9th digit.
+         const getCore = (num) => num.length >= 8 ? num.slice(-8) : num;
+         
+         const webhookCore = getCore(phone);
+         
          let matchPhone = false;
-         if (cp.length > 5) matchPhone = cp.includes(phone) || phone.includes(cp);
+         if (cp.length > 5) {
+            matchPhone = cp.includes(phone) || phone.includes(cp) || getCore(cp) === webhookCore;
+         }
          
          let matchLocal = false;
-         if (lp.length > 5) matchLocal = lp.includes(phone) || phone.includes(lp);
+         if (lp.length > 5) {
+            matchLocal = lp.includes(phone) || phone.includes(lp) || getCore(lp) === webhookCore;
+         }
          
          return matchPhone || matchLocal;
       });
