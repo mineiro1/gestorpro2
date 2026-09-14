@@ -1,21 +1,18 @@
-const http = require('http');
 const https = require('https');
 
 const data = JSON.stringify({
   "object": "wame",
   "entry": [
     {
-      "id": "wame.eW91ci1pbnN0YW5jZS1pZA",
       "changes": [
         {
-          "field": "messages",
           "value": {
             "messages": [
               {
                 "from": "5567991907236",
                 "type": "text",
                 "text": {
-                  "body": "Teste interno log PÚBLICO!"
+                  "body": "Teste public webhook novo"
                 }
               }
             ]
@@ -27,7 +24,7 @@ const data = JSON.stringify({
 });
 
 const options = {
-  hostname: 'ais-pre-lafhr3cxydhbm5z265hztr-86812857430.us-east1.run.app',
+  hostname: 'www.rspiscinas.app.br',
   port: 443,
   path: '/api/webhook/wame',
   method: 'POST',
