@@ -31,22 +31,13 @@ export function ChatModal({ isOpen, onClose, visit, client, waSettings }: any) {
       let { data: sessions, error } = await supabase
         .from('chat_sessions')
         .select('*')
-        .eq('visit_id', visit.id)
+        .eq('client_id', client.id)
+        .eq('status', 'open')
         .order('created_at', { ascending: false });
 
       let currentSession = null;
       if (sessions && sessions.length > 0) {
         currentSession = sessions[0];
-        
-        // Auto close if older than 30 mins and still open
-        if (currentSession.status === 'open') {
-          const createdTime = new Date(currentSession.created_at).getTime();
-          const now = new Date().getTime();
-          if (now - createdTime > 30 * 60 * 1000) {
-             await supabase.from('chat_sessions').update({ status: 'closed', closed_at: new Date().toISOString() }).eq('id', currentSession.id);
-             currentSession.status = 'closed';
-          }
-        }
       } else {
         // Create new session if none exists
         const adminId = userProfile?.role === 'admin' ? userProfile.uid : userProfile?.adminId;
@@ -54,14 +45,14 @@ export function ChatModal({ isOpen, onClose, visit, client, waSettings }: any) {
         const { data: newSession, error: createError } = await supabase
           .from('chat_sessions')
           .insert({
-            visit_id: visit.id,
+            visit_id: visit ? visit.id : null,
             admin_id: adminId,
             client_id: client.id,
             employee_id: userProfile?.uid,
             status: 'open'
           }).select().single();
           
-        console.log("CREATE SESSION RESULT:", newSession, "ERROR:", createError, "PARAMS:", { visit_id: visit.id, admin_id: adminId, client_id: client.id, employee_id: userProfile?.uid });
+        console.log("CREATE SESSION RESULT:", newSession, "ERROR:", createError, "PARAMS:", { visit_id: visit ? visit.id : null, admin_id: adminId, client_id: client.id, employee_id: userProfile?.uid });
 
           
         if (!createError && newSession) {
@@ -75,14 +66,23 @@ export function ChatModal({ isOpen, onClose, visit, client, waSettings }: any) {
         
         // Subscribe to new messages
         const subscription = supabase
-          .channel(`chat_${currentSession.id}`)
+          .channel(`chat_${client.id}`)
           .on('postgres_changes', { 
             event: 'INSERT', 
             schema: 'public', 
-            table: 'chat_messages',
-            filter: `session_id=eq.${currentSession.id}`
-          }, payload => {
-            setMessages(prev => [...prev, payload.new]);
+            table: 'chat_messages'
+          }, (payload) => {
+            // Can't do await directly in the realtime callback nicely, 
+            // so we wrap it in an IIFE (Immediately Invoked Function Expression)
+            (async () => {
+              const { data } = await supabase.from('chat_sessions').select('client_id').eq('id', payload.new.session_id).single();
+              if (data && data.client_id === client.id) {
+                 setMessages(prev => {
+                    if (prev.find(m => m.id === payload.new.id)) return prev;
+                    return [...prev, payload.new];
+                 });
+              }
+            })();
           })
           .subscribe();
           
@@ -98,12 +98,17 @@ export function ChatModal({ isOpen, onClose, visit, client, waSettings }: any) {
   };
 
   const loadMessages = async (sessionId: string) => {
-    const { data } = await supabase
-      .from('chat_messages')
-      .select('*')
-      .eq('session_id', sessionId)
-      .order('created_at', { ascending: true });
-    if (data) setMessages(data);
+    // Carregar histórico de TODAS as sessões do cliente, para não perder mensagens
+    const { data: allSessions } = await supabase.from('chat_sessions').select('id').eq('client_id', client.id);
+    if (allSessions && allSessions.length > 0) {
+       const sessionIds = allSessions.map(s => s.id);
+       const { data } = await supabase
+         .from('chat_messages')
+         .select('*')
+         .in('session_id', sessionIds)
+         .order('created_at', { ascending: true });
+       if (data) setMessages(data);
+    }
   };
 
   const sendMessage = async (text: string) => {

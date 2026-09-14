@@ -151,14 +151,14 @@ export default function Layout() {
               registration.showNotification(title, {
                 body,
                 icon: 'https://cdn-icons-png.flaticon.com/512/123/123382.png',
-                vibrate: [200, 100, 200, 100, 200], // Vibration pattern
+                // vibrate: [200, 100, 200, 100, 200], // Vibration pattern
               });
             });
           } else {
             new Notification(title, { 
               body, 
               icon: 'https://cdn-icons-png.flaticon.com/512/123/123382.png',
-              vibrate: [200, 100, 200, 100, 200]
+              // vibrate: [200, 100, 200, 100, 200]
             });
           }
         }

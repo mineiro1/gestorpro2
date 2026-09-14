@@ -1056,7 +1056,15 @@ export default function Billing() {
                 {waSettings.useMetaApi && (
                   <div className="space-y-4 bg-blue-50/50 p-4 rounded-lg border border-blue-100 animate-fade-in">
                     <h5 className="text-sm font-bold text-blue-900">Credenciais WAME / Meta API</h5>
-                    <p className="text-xs text-blue-700 mb-2 font-medium">Aviso: Textos livres só chegam se o cliente acionou você nas últimas 24h. Use templates aprovados para o 1º contato (não incluso na demo de texto livre).</p>
+                    <p className="text-xs text-blue-700 mb-4 font-medium">Aviso: Textos livres só chegam se o cliente acionou você nas últimas 24h. Use templates aprovados para o 1º contato.</p>
+                    
+                    <div className="bg-white p-3 rounded border border-blue-200 mb-4">
+                      <p className="text-xs font-semibold text-gray-500 mb-1">URL DO WEBHOOK (WAME/META):</p>
+                      <code className="text-sm text-gray-800 break-all select-all">
+                        {window.location.origin}/api/webhook/wame
+                      </code>
+                      <p className="text-xs text-gray-500 mt-2"><b>Eventos necessários:</b> messages</p>
+                    </div>
                     <div>
                       <label className="block text-xs font-medium text-gray-700 mb-1">Server URL (Opcional - deixe vazio para oficial)</label>
                       <input

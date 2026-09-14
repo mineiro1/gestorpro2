@@ -187,13 +187,177 @@ async function processPayment(paymentId, adminId) {
            console.error("Evolution Send Error:", errText);
         }
       } else if (waSettings?.useMetaApi) {
-          // Meta API fallback if they use Meta instead
+        if (!waSettings.metaToken) throw new Error("Token Meta obrigatório");
+        
+        const cleanPhone = clientPhone.replace(/\D/g, '');
+        const number = cleanPhone.startsWith('55') ? cleanPhone : `55${cleanPhone}`;
+        
+        let baseUrl = (waSettings.metaServerUrl || 'https://graph.facebook.com/v19.0').trim().replace(/\/$/, '');
+        if (baseUrl && !baseUrl.startsWith('http')) {
+          baseUrl = 'https://' + baseUrl;
+        }
+        const isWame = baseUrl && !baseUrl.includes('graph.facebook.com');
+        
+        let url, headers, body;
+        if (isWame) {
+           url = `${baseUrl}/${waSettings.metaToken}/message/text`;
+           headers = { 'Content-Type': 'application/json' };
+           body = JSON.stringify({ to: number, text: text });
+        } else {
+           const phoneId = waSettings.metaPhoneNumberId ? `/${waSettings.metaPhoneNumberId}` : '';
+           url = `${baseUrl}${phoneId}/messages`;
+           headers = {
+              'Authorization': `Bearer ${waSettings.metaToken}`,
+              'Content-Type': 'application/json'
+           };
+           body = JSON.stringify({
+              messaging_product: "whatsapp",
+              recipient_type: "individual",
+              to: number,
+              type: "text",
+              text: { preview_url: false, body: text }
+           });
+        }
+        
+        const response = await fetch(url, { method: 'POST', headers, body });
+        if (!response.ok) {
+           const errText = await response.text();
+           console.error("Meta/Wame Send Error:", errText);
+           return res.status(500).json({ error: "Erro na API Meta/WAME", details: errText });
+        }
       }
       
       res.json({ success: true });
     } catch(e) {
       console.error(e);
       res.status(500).json({ error: e.message });
+    }
+  });
+
+
+  // Webhook for WAME / Meta API
+  app.get("/api/webhook/wame", (req, res) => {
+    const mode = req.query["hub.mode"];
+    const challenge = req.query["hub.challenge"];
+    if (mode === "subscribe" && challenge) {
+      return res.status(200).send(challenge);
+    }
+    return res.status(200).send("OK");
+  });
+
+  app.post("/api/webhook/wame", async (req, res) => {
+    try {
+            console.log("Wame/Meta Webhook Received:", JSON.stringify(req.body));
+      // Save debug log to DB just so we can see it!
+      try {
+         await supabaseAdmin.from('chat_messages').insert({
+            session_id: 'e867ca9f-d11f-4bb5-8bc6-96e1455fd260', // fake session ID just to see it in db
+            sender_type: 'client',
+            content: "WEBHOOK_PAYLOAD: " + JSON.stringify(req.body).substring(0, 500)
+         });
+      } catch(e) {}
+      const body = req.body;
+      
+      let phone = "";
+      let content = "";
+      let mediaUrl = "";
+      
+      // Parse Meta API format
+      if ((body.object === "whatsapp_business_account" || body.object === "wame") && body.entry && body.entry[0].changes) {
+         const value = body.entry[0].changes[0].value;
+         if (value.messages && value.messages.length > 0) {
+            const msg = value.messages[0];
+            phone = msg.from; // e.g. "5567991907236"
+            if (msg.type === "text" && msg.text) {
+               content = msg.text.body;
+            } else if (msg.type === "audio") {
+               content = "🎵 Mensagem de Áudio";
+            } else if (msg.type === "image") {
+               content = "📷 Imagem";
+            }
+         } else {
+            // Probably a status update (delivered, read)
+            return res.status(200).send("EVENT_RECEIVED");
+         }
+      } 
+      // Parse alternative Wame/Z-API flat format just in case
+      else if (body.phone && body.message) {
+          phone = body.phone;
+          content = body.message;
+      } else if (body.contact && body.message) {
+          phone = body.contact;
+          content = body.message;
+      } else if (body.from && body.body) { // Another common format
+          phone = body.from;
+          content = body.body;
+      }
+      
+      if (!phone || !content) {
+         return res.status(200).send("EVENT_RECEIVED");
+      }
+      
+      phone = phone.replace(/\D/g, '');
+      
+      const { data: clients, error: clientsErr } = await supabaseAdmin.from('clients').select('id, phone, local_phone, admin_id, employee_id');
+      if (clientsErr) console.error("Webhook clients error:", clientsErr);
+      
+      const matchedClient = clients?.find(c => {
+         const cp = (c.phone || '').replace(/\D/g, '');
+         const lp = (c.local_phone || '').replace(/\D/g, '');
+         if (!cp && !lp) return false;
+         
+         let matchPhone = false;
+         if (cp.length > 5) matchPhone = cp.includes(phone) || phone.includes(cp);
+         
+         let matchLocal = false;
+         if (lp.length > 5) matchLocal = lp.includes(phone) || phone.includes(lp);
+         
+         return matchPhone || matchLocal;
+      });
+      
+      if (!matchedClient) return res.status(200).send("EVENT_RECEIVED");
+
+      const { data: sessions, error: sessionsErr } = await supabaseAdmin
+        .from('chat_sessions')
+        .select('*')
+        .eq('client_id', matchedClient.id)
+        .eq('status', 'open')
+        .order('created_at', { ascending: false });
+        
+      let activeSession = null;
+      
+      if (!sessions || sessions.length === 0) {
+         // Create a new session so the message is not lost!
+         const { data: newSession, error: createErr } = await supabaseAdmin.from('chat_sessions').insert({
+             client_id: matchedClient.id,
+             admin_id: matchedClient.admin_id,
+             employee_id: matchedClient.employee_id || matchedClient.admin_id,
+             status: 'open'
+         }).select().single();
+         if (createErr || !newSession) return res.status(200).send("EVENT_RECEIVED");
+         activeSession = newSession;
+      } else {
+         activeSession = sessions[0];
+      }
+      // Time lock removed for testing
+      // const createdTime = new Date(activeSession.created_at).getTime();
+      // const now = new Date().getTime();
+      // if (now - createdTime > 30 * 60 * 1000) {
+      //    await supabaseAdmin.from('chat_sessions').update({ status: 'closed', closed_at: new Date().toISOString() }).eq('id', activeSession.id);
+      //    return res.status(200).send("EVENT_RECEIVED");
+      // }
+      
+      await supabaseAdmin.from('chat_messages').insert({
+         session_id: activeSession.id,
+         sender_type: 'client',
+         content: content,
+         media_url: mediaUrl
+      });
+      
+      return res.status(200).send("EVENT_RECEIVED");
+    } catch(e) {
+      console.error("Wame Webhook Error:", e);
+      return res.status(500).send("Error");
     }
   });
 
@@ -243,7 +407,7 @@ async function processPayment(paymentId, adminId) {
       // For safety, we query the chat_sessions matching the client.
       
       // A more robust query would search by phone or local_phone
-      const { data: clients } = await supabaseAdmin.from('clients').select('id, phone, local_phone');
+      const { data: clients } = await supabaseAdmin.from('clients').select('id, phone, local_phone, admin_id, employee_id');
       if (!clients) return res.status(200).send("OK");
       
       // Find matching client
@@ -260,21 +424,30 @@ async function processPayment(paymentId, adminId) {
         .from('chat_sessions')
         .select('*')
         .eq('client_id', matchedClient.id)
-        .eq('status', 'open');
+        .eq('status', 'open')
+        .order('created_at', { ascending: false });
         
+      let activeSession = null;
       if (!sessions || sessions.length === 0) {
-         return res.status(200).send("OK"); // No active session
+         const { data: newSession, error: createErr } = await supabaseAdmin.from('chat_sessions').insert({
+             client_id: matchedClient.id,
+             admin_id: matchedClient.admin_id,
+             employee_id: matchedClient.employee_id || matchedClient.admin_id,
+             status: 'open'
+         }).select().single();
+         if (createErr || !newSession) return res.status(200).send("OK");
+         activeSession = newSession;
+      } else {
+         activeSession = sessions[0];
       }
       
-      // Check 30-min timeout
-      const activeSession = sessions[0];
-      const createdTime = new Date(activeSession.created_at).getTime();
-      const now = new Date().getTime();
-      if (now - createdTime > 30 * 60 * 1000) {
-         // Auto close it
-         await supabaseAdmin.from('chat_sessions').update({ status: 'closed', closed_at: new Date().toISOString() }).eq('id', activeSession.id);
-         return res.status(200).send("OK");
-      }
+      // Time lock removed for testing
+      // const createdTime = new Date(activeSession.created_at).getTime();
+      // const now = new Date().getTime();
+      // if (now - createdTime > 30 * 60 * 1000) {
+      //    await supabaseAdmin.from('chat_sessions').update({ status: 'closed', closed_at: new Date().toISOString() }).eq('id', activeSession.id);
+      //    return res.status(200).send("OK");
+      // }
 
       // Save message
       await supabaseAdmin.from('chat_messages').insert({
@@ -376,6 +549,13 @@ app.all("/api/sync-payment", async (req, res) => {
       res.sendFile(path.join(distPath, 'index.html'));
     });
   }
+
+  app.get('/api/test-env', (req, res) => {
+    res.json({
+        hasServiceKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
+        hasAnonKey: !!process.env.VITE_SUPABASE_ANON_KEY
+    });
+});
 
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running on http://localhost:${PORT}`);
