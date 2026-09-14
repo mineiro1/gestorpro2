@@ -1,7 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 
 export default async function handler(req, res) {
-  // 1. Handle Wame/Meta GET Verification Challenge
   if (req.method === 'GET') {
     const mode = req.query["hub.mode"];
     const challenge = req.query["hub.challenge"];
@@ -11,7 +10,6 @@ export default async function handler(req, res) {
     return res.status(200).send("Wame Webhook is active!");
   }
 
-  // 2. Handle POST Messages
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method Not Allowed' });
   }
@@ -19,11 +17,17 @@ export default async function handler(req, res) {
   try {
     const supabaseUrl = process.env.VITE_SUPABASE_URL || '';
     const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY || '';
+    
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
       auth: { autoRefreshToken: false, persistSession: false }
     });
 
-    const body = req.body;
+    // Extremely aggressive Vercel body parser fallback
+    let body = req.body;
+    if (typeof body === 'string') {
+      try { body = JSON.parse(body); } catch(e) {}
+    }
+
     let phone = "";
     let content = "";
     let mediaUrl = "";
@@ -36,12 +40,8 @@ export default async function handler(req, res) {
           phone = msg.from;
           if (msg.type === "text" && msg.text) {
              content = msg.text.body;
-          } else if (msg.type === "audio") {
-             content = "🎵 Mensagem de Áudio";
-          } else if (msg.type === "image") {
-             content = "📷 Imagem";
-          } else if (msg.type === "document") {
-             content = "📄 Documento";
+          } else {
+             content = `[Media: ${msg.type}]`;
           }
        } else {
           return res.status(200).send("EVENT_RECEIVED");
@@ -62,10 +62,8 @@ export default async function handler(req, res) {
     if (!phone || !content) {
        return res.status(200).send("EVENT_RECEIVED");
     }
-    
-    // 3. Robust Phone Matching (Bypass 9th digit and DDD inconsistencies)
+
     const { data: clients, error: clientsErr } = await supabaseAdmin.from('clients').select('id, phone, local_phone, admin_id');
-    if (clientsErr) console.error("Webhook clients error:", clientsErr);
     
     const matchedClient = (clients || []).find(c => {
        const cp = (c.phone || '').replace(/\D/g, '');
@@ -89,11 +87,9 @@ export default async function handler(req, res) {
     });
     
     if (!matchedClient) {
-        console.log("Client not found for phone:", phone);
         return res.status(200).send("EVENT_RECEIVED");
     }
 
-    // 4. Find or Create Session
     const { data: sessions } = await supabaseAdmin
       .from('chat_sessions')
       .select('*')
@@ -103,50 +99,30 @@ export default async function handler(req, res) {
       
     let activeSession = sessions && sessions.length > 0 ? sessions[0] : null;
     
-    const now = new Date().getTime();
-    if (activeSession) {
-       const createdTime = new Date(activeSession.created_at).getTime();
-       // Auto-close if older than 30 mins
-       if (now - createdTime > 30 * 60 * 1000) {
-          await supabaseAdmin.from('chat_sessions').update({ status: 'closed', closed_at: new Date().toISOString() }).eq('id', activeSession.id);
-          activeSession = null;
-       }
-    }
-    
     if (!activeSession) {
-       const { data: newSession, error: newSessionError } = await supabaseAdmin
+       const { data: newSession } = await supabaseAdmin
          .from('chat_sessions')
          .insert({
             client_id: matchedClient.id,
             admin_id: matchedClient.admin_id,
-            employee_id: matchedClient.admin_id, // fallback to admin
+            employee_id: matchedClient.admin_id,
             status: 'open'
          }).select().single();
-       if (newSessionError) {
-          console.error("Failed to create new session:", newSessionError);
-          return res.status(200).send("EVENT_RECEIVED");
-       }
        activeSession = newSession;
     }
     
-    // 5. Save the Message
-    const { error: insertError } = await supabaseAdmin.from('chat_messages').insert({
-       session_id: activeSession.id,
-       sender_type: 'client',
-       content: content,
-       media_url: mediaUrl
-    });
-    
-    if (insertError) {
-       console.error("Error inserting message:", insertError);
-    } else {
-       console.log("Message successfully saved to session", activeSession.id);
+    if (activeSession) {
+      await supabaseAdmin.from('chat_messages').insert({
+         session_id: activeSession.id,
+         sender_type: 'client',
+         content: content,
+         media_url: mediaUrl
+      });
     }
     
     return res.status(200).send("EVENT_RECEIVED");
     
   } catch(e) {
-    console.error("Webhook Error:", e);
     return res.status(500).send("Error");
   }
 }
