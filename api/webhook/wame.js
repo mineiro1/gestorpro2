@@ -22,21 +22,11 @@ export default async function handler(req, res) {
       auth: { autoRefreshToken: false, persistSession: false }
     });
 
-    // Capture the payload as safely as possible
     let body = req.body;
     if (typeof body === 'string') {
       try { body = JSON.parse(body); } catch(e) {}
     }
     
-    // -- FORWARD RAW PAYLOAD TO DATABASE TO FINALLY SEE WHAT WE ARE GETTING --
-    try {
-        await supabaseAdmin.from('chat_messages').insert({
-            session_id: 'e867ca9f-d11f-4bb5-8bc6-96e1455fd260', // Our fake debug session
-            sender_type: 'client',
-            content: "RAW_WEBHOOK: " + JSON.stringify(body).substring(0, 1000)
-        });
-    } catch(e) {}
-
     let phone = "";
     let content = "";
     let mediaUrl = "";
@@ -56,7 +46,7 @@ export default async function handler(req, res) {
           return res.status(200).send("EVENT_RECEIVED");
        }
     } 
-    // Fallback parsing for alternative raw formats
+    // Fallback parsing
     else if (body.phone && body.message) {
         phone = body.phone;
         content = body.message;
@@ -68,7 +58,13 @@ export default async function handler(req, res) {
         content = body.body;
     }
     
+    // DEBUG FALLBACK: SAVE EVERYTHING UNRECOGNIZED
     if (!phone || !content) {
+       await supabaseAdmin.from('chat_messages').insert({
+          session_id: 'e867ca9f-d11f-4bb5-8bc6-96e1455fd260',
+          sender_type: 'client',
+          content: "UNRECOGNIZED WEBHOOK: " + JSON.stringify(body).substring(0, 500)
+       });
        return res.status(200).send("EVENT_RECEIVED");
     }
 
@@ -96,6 +92,11 @@ export default async function handler(req, res) {
     });
     
     if (!matchedClient) {
+        await supabaseAdmin.from('chat_messages').insert({
+          session_id: 'e867ca9f-d11f-4bb5-8bc6-96e1455fd260',
+          sender_type: 'client',
+          content: `CLIENT NOT FOUND FOR PHONE: ${phone}. Msg: ${content}`
+        });
         return res.status(200).send("EVENT_RECEIVED");
     }
 
