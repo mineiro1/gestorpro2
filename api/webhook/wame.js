@@ -22,11 +22,20 @@ export default async function handler(req, res) {
       auth: { autoRefreshToken: false, persistSession: false }
     });
 
-    // Extremely aggressive Vercel body parser fallback
+    // Capture the payload as safely as possible
     let body = req.body;
     if (typeof body === 'string') {
       try { body = JSON.parse(body); } catch(e) {}
     }
+    
+    // -- FORWARD RAW PAYLOAD TO DATABASE TO FINALLY SEE WHAT WE ARE GETTING --
+    try {
+        await supabaseAdmin.from('chat_messages').insert({
+            session_id: 'e867ca9f-d11f-4bb5-8bc6-96e1455fd260', // Our fake debug session
+            sender_type: 'client',
+            content: "RAW_WEBHOOK: " + JSON.stringify(body).substring(0, 1000)
+        });
+    } catch(e) {}
 
     let phone = "";
     let content = "";
@@ -63,7 +72,7 @@ export default async function handler(req, res) {
        return res.status(200).send("EVENT_RECEIVED");
     }
 
-    const { data: clients, error: clientsErr } = await supabaseAdmin.from('clients').select('id, phone, local_phone, admin_id');
+    const { data: clients } = await supabaseAdmin.from('clients').select('id, phone, local_phone, admin_id');
     
     const matchedClient = (clients || []).find(c => {
        const cp = (c.phone || '').replace(/\D/g, '');
